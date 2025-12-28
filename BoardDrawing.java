@@ -16,9 +16,9 @@ public class BoardDrawing extends JComponent {
     private final Color COLOR_HOLE = new Color(255, 255, 255);  // White
     
     // Layout Constants
-    final int MARGIN_TOP = 100;
-    final int MARGIN_LEFT = 50; // Increased margin for centering
-    final int HOLE_DIAMETER = 50; // Larger holes
+    final int MARGIN_TOP = 50; // Reduced from 70
+    final int MARGIN_LEFT = 50; 
+    final int HOLE_DIAMETER = 50; 
     final int HOLE_GAP = 15;
     final int PADDING = 20;
 
@@ -28,14 +28,10 @@ public class BoardDrawing extends JComponent {
     
     public BoardDrawing(GameState gs) {
         state = gs;
-        this.setPreferredSize(new Dimension(BOARD_WIDTH + 100, BOARD_HEIGHT + 150)); 
+        // Reduced vertical buffer from 150 to 120
+        this.setPreferredSize(new Dimension(BOARD_WIDTH + 100, BOARD_HEIGHT + 120)); 
         
         // Define board shape relative to (0,0) of the board coordinates
-        // We will translate this into position during paint logic
-        // MARGIN_TOP is now internal to the translated context or handled via translation
-        
-        // Let's treat (0,0) as the top-left of the BOARD itself.
-        // So the board rectangle starts at 0,0 locally.
         board = new RoundRectangle2D.Double(0, 0, BOARD_WIDTH, BOARD_HEIGHT, 30, 30);
         
         // Initialize holes positions relative to the board's (0,0)
@@ -52,6 +48,9 @@ public class BoardDrawing extends JComponent {
                 holes.add(hole);
             }
         }
+        
+        // Enforce size for layout managers
+        this.setMinimumSize(this.getPreferredSize());
     }
 
     @Override
@@ -67,12 +66,12 @@ public class BoardDrawing extends JComponent {
         g2.setColor(COLOR_BG);
         g2.fillRect(0, 0, getWidth(), getHeight());
         
-        // Draw Status Message (Centered at top, fixed position relative to panel)
+        // Draw Status Message
         drawStatusMessage(g2);
 
         // Calculate centering offset
         int translateX = (getWidth() - BOARD_WIDTH) / 2;
-        int translateY = MARGIN_TOP; // Fixed top margin for the board
+        int translateY = MARGIN_TOP;
         
         // Save old transform
         AffineTransform oldTx = g2.getTransform();
@@ -80,7 +79,7 @@ public class BoardDrawing extends JComponent {
         // Apply Translation
         g2.translate(translateX, translateY);
 
-        // Draw Board Body with Shadow/Gradient
+        // Draw Board Body
         drawBoard(g2);
 
         // Draw Pieces
@@ -89,11 +88,10 @@ public class BoardDrawing extends JComponent {
         // Draw Row Labels
         drawRowLabels(g2);
         
-        // Restore transform for elements that shouldn't be translated (if any future ones)
-        // OR just keeping it clean
+        // Restore transform
         g2.setTransform(oldTx);
         
-        // Draw Error Message (at bottom, centered in panel)
+        // Draw Error Message
         if (state.getError() != null) {
             drawErrorMessage(g2, state.getError());
         }
@@ -117,16 +115,16 @@ public class BoardDrawing extends JComponent {
             msgColor = COLOR_RED;
         } else {
             message = "Yellow's Turn";
-            msgColor = COLOR_YELLOW.darker(); // Darker to be readable on light BG
+            msgColor = COLOR_YELLOW.darker(); 
         }
         
         g2.setFont(new Font("SansSerif", Font.BOLD, 30));
         FontMetrics fm = g2.getFontMetrics();
         int w = fm.stringWidth(message);
         
-        // Draw centered at top
+        // Draw centered at top, moved up to 40 (was 60)
         g2.setColor(msgColor);
-        g2.drawString(message, (getWidth() - w) / 2, 60);
+        g2.drawString(message, (getWidth() - w) / 2, 40);
     }
 
     private void drawBoard(Graphics2D g2) {
@@ -155,32 +153,16 @@ public class BoardDrawing extends JComponent {
 
     private void drawPieces(Graphics2D g2) {
         Boolean[][] pieces = state.getPieces();
-        // iterate mapping to our holes array logic
-        // Game state: pieces[col][row] where row=0 is bottom
         
         for (int i = 0; i < 7; i++) { // col
             for (int j = 0; j < 6; j++) { // row
                 Boolean isRed = pieces[i][j];
                 if (isRed != null) {
-                    // Calculate visual position (same logic as hole creation)
-                    // We can actually just find the matching hole index
-                    // hole index = (i * 6) + j
-                    // wait, creating holes:
-                    // for i=0..7 { for j=0..6 } -> add
-                    // so holes.get(i*6 + j) IS the correct hole
-                    
                     Ellipse2D.Double targetHole = holes.get(i * 6 + j);
                     
                     Color baseColor = isRed ? COLOR_RED : COLOR_YELLOW;
                     
-                    // Radial Gradient for 3D sphere look
-                    Point2D center = new Point2D.Double(targetHole.getCenterX() - 10, targetHole.getCenterY() - 10);
-                    float radius = (float) targetHole.width;
-                    float[] dist = {0.0f, 1.0f};
-                    Color[] colors = {Color.WHITE, baseColor};
-                    RadialGradientPaint p = new RadialGradientPaint(center, radius, dist, colors);
-                    
-                    // Or simpler linear gradient
+                    // Simple linear gradient for pieces
                     GradientPaint gp = new GradientPaint(
                             (float)targetHole.x, (float)targetHole.y, baseColor.brighter(),
                             (float)targetHole.x + (float)targetHole.width, (float)targetHole.y + (float)targetHole.height, baseColor.darker()
@@ -202,17 +184,8 @@ public class BoardDrawing extends JComponent {
         g2.setFont(new Font("SansSerif", Font.PLAIN, 16));
         g2.setColor(Color.GRAY);
         
-        // We need the x center of each column (i: 0-6)
-        // first hole of col i is at holes.get(i*6)
-        
         for(int i = 0; i < 7; i++) {
-            Ellipse2D.Double bottomHole = holes.get(i * 6 + 0); // row 0 is bottom
-            // Wait, we generate holes j=0 as bottom? 
-            // In init: y = (MARGIN_TOP ...) - (j * ...). Yes j=0 is bottom, j=5 is top.
-            // Wait, holes list order:
-            // i=0 loop: j=0..5 additions.
-            // so index = i*6 + j.
-            
+            Ellipse2D.Double bottomHole = holes.get(i * 6 + 0); 
             double cx = bottomHole.getCenterX();
             double y = board.getMaxY() + 25;
             
@@ -226,10 +199,9 @@ public class BoardDrawing extends JComponent {
         g2.setFont(new Font("SansSerif", Font.BOLD, 18));
         g2.setColor(new Color(231, 76, 60)); // Red error
         // Draw at bottom
-        // Since we restored translation, we can use absolute Y relative to panel
-        // Board is at MARGIN_TOP to MARGIN_TOP + BOARD_HEIGHT
         
-        int y = MARGIN_TOP + BOARD_HEIGHT + 47;
+        // Increased offset from 35 to 60 to clear row labels
+        int y = MARGIN_TOP + BOARD_HEIGHT + 60;
         int w = g2.getFontMetrics().stringWidth("Oops! " + error);
         g2.drawString("Oops! " + error, (getWidth() - w) / 2, y);
     }

@@ -19,6 +19,23 @@ public class GameState {
 		redsTurn = true;
 		moves = new Stack<>();
 	}
+
+    // Copy constructor for Minimax
+    public GameState(GameState other) {
+        this.pieces = new Boolean[7][6];
+        for (int i = 0; i < 7; i++) {
+            for (int j = 0; j < 6; j++) {
+                this.pieces[i][j] = other.pieces[i][j];
+            }
+        }
+        this.gameOver = other.gameOver;
+        this.redWins = other.redWins;
+        this.yellowWins = other.yellowWins;
+        this.redsTurn = other.redsTurn;
+        this.moves = new Stack<>();
+        this.moves.addAll(other.moves);
+        this.error = other.error;
+    }
 	
 	//resets the error message and tries to move the next piece into the specified row
 	//if the move is invalid, sets the proper error message
@@ -231,6 +248,11 @@ public class GameState {
 	public boolean getGameOver(){
 		return gameOver;
 	}
+
+    public boolean isColumnFull(int col) {
+        if (col < 1 || col > 7) return true;
+        return pieces[col - 1][5] != null;
+    }
 
 
 

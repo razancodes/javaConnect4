@@ -2,17 +2,21 @@ import java.awt.*;
 import java.awt.event.*;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import java.util.concurrent.ExecutionException;
 
 public class Connect4UI {
     
-    // Theme Colors (matching BoardDrawing)
+    // Theme Colors
     private static final Color COLOR_BG = new Color(236, 240, 241);
-    private static final Color COLOR_BTN = new Color(52, 152, 219); // Blue button
+    private static final Color COLOR_BTN_BLUE = new Color(52, 152, 219);
+    private static final Color COLOR_BTN_GREEN = new Color(46, 204, 113);
     private static final Color COLOR_BTN_TEXT = Color.WHITE;
-    private static final Color COLOR_ACCENT = new Color(44, 62, 80);
+    
+    private static boolean isBotMode = false;
+    private static final Connect4Bot bot = new Connect4Bot();
+    private static boolean botThinking = false;
 
     public static void main(String[] args) {
-        // Run on EDT
         SwingUtilities.invokeLater(() -> createAndShowGUI());
     }
 
@@ -20,38 +24,115 @@ public class Connect4UI {
         JFrame frame = new JFrame("Connect 4 - Modern Edition");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setBackground(COLOR_BG);
+        frame.setSize(800, 600);
         
-        // Main Container Panel
-        JPanel mainPanel = new JPanel(new BorderLayout());
+        // Main Container with CardLayout
+        CardLayout cardLayout = new CardLayout();
+        JPanel mainPanel = new JPanel(cardLayout);
         mainPanel.setBackground(COLOR_BG);
         frame.setContentPane(mainPanel);
 
+        // --- Start Screen ---
+        JPanel startPanel = createStartPanel(cardLayout, mainPanel);
+        mainPanel.add(startPanel, "START");
+
+        // --- Game Screen ---
         final GameState state = new GameState();
         final BoardDrawing board = new BoardDrawing(state);
-        
-        // Center the board
+        JPanel gamePanel = createGamePanel(cardLayout, mainPanel, state, board);
+        mainPanel.add(gamePanel, "GAME");
+
+        // Show Start Screen initially
+        cardLayout.show(mainPanel, "START");
+
+        frame.pack(); // Pack to fit the start screen or preferred size
+        // Ensure the frame is at least big enough for the game
+        frame.setMinimumSize(new Dimension(800, 720)); 
+        frame.setSize(800, 720); // Explicitly set a taller size
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
+    }
+
+    private static JPanel createStartPanel(CardLayout cardLayout, JPanel mainPanel) {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBackground(COLOR_BG);
+
+        JLabel title = new JLabel("Connect 4");
+        title.setFont(new Font("SansSerif", Font.BOLD, 48));
+        title.setForeground(new Color(44, 62, 80));
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 30, 0));
+        buttonPanel.setBackground(COLOR_BG);
+
+        JButton btnPvp = createStyledButton("PVP", COLOR_BTN_BLUE);
+        btnPvp.setPreferredSize(new Dimension(150, 60));
+        btnPvp.addActionListener(e -> {
+            isBotMode = false;
+            cardLayout.show(mainPanel, "GAME");
+            // Force layout update just in case
+            mainPanel.revalidate();
+            mainPanel.repaint();
+        });
+
+        JButton btnBot = createStyledButton("BOT", COLOR_BTN_GREEN);
+        btnBot.setPreferredSize(new Dimension(150, 60));
+        btnBot.addActionListener(e -> {
+            isBotMode = true;
+            cardLayout.show(mainPanel, "GAME");
+            mainPanel.revalidate();
+            mainPanel.repaint();
+        });
+
+        buttonPanel.add(btnPvp);
+        buttonPanel.add(btnBot);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.insets = new Insets(0, 0, 50, 0);
+        panel.add(title, gbc);
+
+        gbc.gridy = 1;
+        gbc.insets = new Insets(0, 0, 0, 0);
+        panel.add(buttonPanel, gbc);
+
+        return panel;
+    }
+
+    private static JPanel createGamePanel(CardLayout cardLayout, JPanel mainPanel, GameState state, BoardDrawing board) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(COLOR_BG);
+
+        // Board Area
         JPanel boardPanel = new JPanel(new GridBagLayout());
         boardPanel.setBackground(COLOR_BG);
         boardPanel.add(board);
-        mainPanel.add(boardPanel, BorderLayout.CENTER);
+        panel.add(boardPanel, BorderLayout.CENTER);
 
-        // Control Panel (Buttons)
+        // Controls Area
         JPanel controlsPanel = new JPanel();
         controlsPanel.setLayout(new BoxLayout(controlsPanel, BoxLayout.Y_AXIS));
         controlsPanel.setBackground(COLOR_BG);
         controlsPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
 
-        // Column Selection Buttons
+        // Column Buttons
         JPanel dropButtonsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
         dropButtonsPanel.setBackground(COLOR_BG);
         
         for (int i = 1; i <= 7; i++) {
             final int col = i;
-            JButton btn = createStyledButton(String.valueOf(i));
+            JButton btn = createStyledButton(String.valueOf(i), COLOR_BTN_BLUE);
             btn.setPreferredSize(new Dimension(50, 40));
             btn.addActionListener(e -> {
+                if (botThinking || state.getGameOver()) return; // Prevent moves while bot thinks
+
                 state.move(col);
                 board.repaint();
+                
+                // Trigger Bot if applicable
+                if (isBotMode && !state.getGameOver() && !state.getRedsTurn()) {
+                    triggerBotMove(state, board);
+                }
             });
             dropButtonsPanel.add(btn);
         }
@@ -61,35 +142,77 @@ public class Connect4UI {
         gameActionPanel.setBackground(COLOR_BG);
         gameActionPanel.setBorder(new EmptyBorder(20, 0, 0, 0));
 
-        JButton btnUndo = createStyledButton("Undo");
-        btnUndo.setBackground(new Color(149, 165, 166)); // Grey
+        JButton btnUndo = createStyledButton("Undo", COLOR_BTN_BLUE);
         btnUndo.addActionListener(e -> {
-            state.undo();
+            if (isBotMode) {
+                // If it's bot mode, we generally want to undo TWO moves (Bot's move + Player's move)
+                // to get back to Player's turn.
+                // But check if at least 2 moves exist.
+                if (state.getMoves().size() >= 2) {
+                    state.undo(); // Undo Bot's move
+                    state.undo(); // Undo Player's move
+                } else if (state.getMoves().size() == 1) {
+                    // Start of game oddity (maybe bot hasn't moved yet?)
+                    state.undo();
+                } else {
+                    // 0 moves, do nothing or show error
+                     // Let standard undo handle empty stack error if we want, 
+                     // but state.undo() checks internally.
+                     state.undo();
+                }
+            } else {
+                state.undo();
+            }
             board.repaint();
         });
 
-        JButton btnRestart = createStyledButton("Restart");
-        btnRestart.setBackground(new Color(46, 204, 113)); // Green
+        JButton btnRestart = createStyledButton("Restart", COLOR_BTN_GREEN);
         btnRestart.addActionListener(e -> {
             state.restart();
             board.repaint();
+            cardLayout.show(mainPanel, "START");
         });
 
         gameActionPanel.add(btnUndo);
         gameActionPanel.add(btnRestart);
 
-        // Add button panels to controls
         controlsPanel.add(dropButtonsPanel);
         controlsPanel.add(gameActionPanel);
+        panel.add(controlsPanel, BorderLayout.SOUTH);
 
-        mainPanel.add(controlsPanel, BorderLayout.SOUTH);
-
-        frame.pack();
-        frame.setLocationRelativeTo(null); // Center on screen
-        frame.setVisible(true);
+        return panel;
     }
 
-    private static JButton createStyledButton(String text) {
+    private static void triggerBotMove(GameState state, BoardDrawing board) {
+        botThinking = true;
+        // Run bot logic in background to keep UI responsive
+        SwingWorker<Integer, Void> worker = new SwingWorker<Integer, Void>() {
+            @Override
+            protected Integer doInBackground() throws Exception {
+                // Small delay for better UX
+                Thread.sleep(500);
+                return bot.getBestMove(state);
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    int col = get();
+                    if (col != -1) {
+                        state.move(col);
+                        board.repaint();
+                    }
+                } catch (InterruptedException | ExecutionException e) {
+                    e.printStackTrace();
+                } finally {
+                    botThinking = false;
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private static JButton createStyledButton(String text, Color bg) {
         JButton btn = new JButton(text) {
             @Override
             protected void paintComponent(Graphics g) {
@@ -118,7 +241,7 @@ public class Connect4UI {
         
         btn.setFont(new Font("SansSerif", Font.BOLD, 14));
         btn.setForeground(COLOR_BTN_TEXT);
-        btn.setBackground(COLOR_BTN);
+        btn.setBackground(bg);
         btn.setFocusPainted(false);
         btn.setBorderPainted(false);
         btn.setContentAreaFilled(false);
