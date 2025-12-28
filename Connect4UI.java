@@ -21,7 +21,7 @@ public class Connect4UI {
     }
 
     private static void createAndShowGUI() {
-        JFrame frame = new JFrame("Connect 4 - Modern Edition");
+        JFrame frame = new JFrame("Connect 4");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setBackground(COLOR_BG);
         frame.setSize(800, 600);
@@ -58,7 +58,7 @@ public class Connect4UI {
         panel.setBackground(COLOR_BG);
 
         JLabel title = new JLabel("Connect 4");
-        title.setFont(new Font("SansSerif", Font.BOLD, 48));
+        title.setFont(new Font("Courier New", Font.BOLD, 48));
         title.setForeground(new Color(44, 62, 80));
 
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 30, 0));
@@ -190,7 +190,7 @@ public class Connect4UI {
             @Override
             protected Integer doInBackground() throws Exception {
                 // Small delay for better UX
-                Thread.sleep(500);
+                // Thread.sleep(500); // removed the delay for deeper search...
                 return bot.getBestMove(state);
             }
 
@@ -239,7 +239,7 @@ public class Connect4UI {
             }
         };
         
-        btn.setFont(new Font("SansSerif", Font.BOLD, 14));
+        btn.setFont(new Font("Courier New", Font.BOLD, 14));
         btn.setForeground(COLOR_BTN_TEXT);
         btn.setBackground(bg);
         btn.setFocusPainted(false);

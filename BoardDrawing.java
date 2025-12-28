@@ -115,16 +115,16 @@ public class BoardDrawing extends JComponent {
             msgColor = COLOR_RED;
         } else {
             message = "Yellow's Turn";
-            msgColor = COLOR_YELLOW.darker(); 
+            msgColor = COLOR_YELLOW; 
         }
         
-        g2.setFont(new Font("SansSerif", Font.BOLD, 30));
+        g2.setFont(new Font("Courier New", Font.BOLD, 30));
         FontMetrics fm = g2.getFontMetrics();
         int w = fm.stringWidth(message);
         
         // Draw centered at top, moved up to 40 (was 60)
         g2.setColor(msgColor);
-        g2.drawString(message, (getWidth() - w) / 2, 40);
+        g2.drawString(message, (getWidth() - w) / 2, 35);
     }
 
     private void drawBoard(Graphics2D g2) {
@@ -181,7 +181,7 @@ public class BoardDrawing extends JComponent {
     }
     
     private void drawRowLabels(Graphics2D g2) {
-        g2.setFont(new Font("SansSerif", Font.PLAIN, 16));
+        g2.setFont(new Font("Courier New", Font.PLAIN, 16));
         g2.setColor(Color.GRAY);
         
         for(int i = 0; i < 7; i++) {
@@ -196,7 +196,7 @@ public class BoardDrawing extends JComponent {
     }
 
     private void drawErrorMessage(Graphics2D g2, String error) {
-        g2.setFont(new Font("SansSerif", Font.BOLD, 18));
+        g2.setFont(new Font("Courier New", Font.BOLD, 18));
         g2.setColor(new Color(231, 76, 60)); // Red error
         // Draw at bottom
         
